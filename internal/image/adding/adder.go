@@ -2,19 +2,21 @@ package adding
 
 import (
 	"io"
-
-	"github.com/Eviljeks/blurer/internal/storage"
 )
 
-type Adder struct {
-	storage *storage.Storage
+type Writer interface {
+	Write(r io.Reader, filepath string) error
 }
 
-func NewAdder(storage *storage.Storage) *Adder {
-	return &Adder{storage: storage}
+type Adder struct {
+	writer Writer
+}
+
+func NewAdder(writer Writer) *Adder {
+	return &Adder{writer: writer}
 }
 
 func (a *Adder) Add(r io.Reader, filepath string) (string, error) {
-	err := a.storage.Write(r, filepath)
+	err := a.writer.Write(r, filepath)
 	return filepath, err
 }

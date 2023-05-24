@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"image"
+	"io"
 	"mime/multipart"
 	"net/http"
 	"path/filepath"
@@ -16,19 +17,22 @@ import (
 	"github.com/Eviljeks/blurer/internal/image/encoding"
 	"github.com/Eviljeks/blurer/internal/image/imageprocessing"
 	"github.com/Eviljeks/blurer/internal/image/uploading"
-	"github.com/Eviljeks/blurer/internal/storage"
 	"github.com/Eviljeks/blurer/internal/store"
 )
 
-type BlurHandler struct {
-	blurer     *imageprocessing.Blurer
-	s          *store.Store
-	imgStorage *storage.Storage
-	uploader   *uploading.Uploader
+type Opener interface {
+	Open(src string) (io.ReadWriteCloser, error)
 }
 
-func NewBlurHandler(blurer *imageprocessing.Blurer, s *store.Store, imgStorage *storage.Storage, uploader *uploading.Uploader) *BlurHandler {
-	return &BlurHandler{blurer: blurer, s: s, imgStorage: imgStorage, uploader: uploader}
+type BlurHandler struct {
+	blurer   *imageprocessing.Blurer
+	s        *store.Store
+	opener   Opener
+	uploader *uploading.Uploader
+}
+
+func NewBlurHandler(blurer *imageprocessing.Blurer, s *store.Store, opener Opener, uploader *uploading.Uploader) *BlurHandler {
+	return &BlurHandler{blurer: blurer, s: s, opener: opener, uploader: uploader}
 }
 
 type BlurUploadedImageParams struct {
@@ -124,10 +128,11 @@ func (bh *BlurHandler) doBlur(
 	x1 int,
 	y1 int,
 ) (*img.BlurImage, error) {
-	imgFile, err := bh.imgStorage.Open(i.Path)
+	imgFile, err := bh.opener.Open(i.Path)
 	if err != nil {
 		return nil, fmt.Errorf("could not open image file: %s, %s", imgFile, err)
 	}
+	defer imgFile.Close()
 
 	srcImage, _, err := image.Decode(imgFile)
 	if err != nil {
